@@ -1,5 +1,7 @@
 # The Sunday Table
 
+**Live application:** [sweetspicy.up.railway.app](https://sweetspicy.up.railway.app/)
+
 A warm, mobile-friendly meal availability site with:
 
 - A public “available now” page with category filters
