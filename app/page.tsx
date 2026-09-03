@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { Meal, seedMeals } from "./lib/seed";
 
 export default function Home() {
@@ -75,18 +76,24 @@ export default function Home() {
   return (
     <main>
       <header className="masthead">
-        <a href="#available" className="wordmark">Sweet & Spicy <span>African Foods</span> </a>
+        <a href="#available" className="wordmark"><span className="brand-disc">S&amp;S</span><span className="brand-name">Sweet &amp; Spicy <i>African Foods</i></span></a>
         <div className="masthead-note">Home-cooked meals<br />posted when ready</div>
         <button className="dashboard-link" onClick={openOwner}>{authenticated ? "Manage meals" : "Owner sign in"}</button>
       </header>
 
       <section className="intro" id="available">
-        <div className="intro-kicker"><span className="live-dot" /> Availability board</div>
-        <h1>Here&apos;s what&apos;s<br /><i>ready right now.</i></h1>
-        <div className="intro-details">
-          <p>Meals are made when time and ingredients allow. There&apos;s no fixed menu or schedule.</p>
-          <p><strong>First come, first served.</strong><br />Ask directly to claim a meal.</p>
+        <div className="intro-copy">
+          <div className="intro-kicker"><span className="live-dot" /> Availability board</div>
+          <h1>Here&apos;s what&apos;s<br /><i>ready right now.</i></h1>
+          <div className="intro-details">
+            <p>Meals are made when time and ingredients allow. There&apos;s no fixed menu or schedule.</p>
+            <p><strong>First come, first served.</strong><br />Ask directly to claim a meal.</p>
+          </div>
         </div>
+        <figure className="brand-poster">
+          <Image src="/media/logo.png" alt="Sweet and Spicy African Foods logo, prepared foods, spices, and phone number 937 580 1373" width={4682} height={6294} priority sizes="(max-width: 800px) 88vw, 31vw" />
+          <figcaption>West African food and seasonings · Dayton, Ohio</figcaption>
+        </figure>
         <div className="stamp" aria-hidden="true">Updated<br />as needed</div>
       </section>
 
@@ -113,7 +120,18 @@ export default function Home() {
         <aside className="board-footnote"><strong>Good to know</strong><p>Availability can change quickly. The board confirms what is being offered—not a reservation.</p></aside>
       </section>
 
-      <footer><span>Sweet & Spicy Meal Board</span><p>A simple noticeboard for whatever&apos;s cooking.</p><button onClick={openOwner}>Owner access</button></footer>
+      <section className="welcome-band" aria-label="Welcome from Sweet and Spicy African Foods">
+        <div className="welcome-copy"><span>Welcome · Akwaaba</span><p>A little piece of the business, in sound.</p></div>
+        <div className="theme-player">
+          <div><strong>Sweet &amp; Spicy Theme Song</strong><small>Created for Sweet &amp; Spicy African Foods</small></div>
+          <audio controls preload="none" aria-label="Play the Sweet and Spicy African Foods theme song">
+            <source src="/media/sweet-and-spicy-theme.mp3" type="audio/mpeg" />
+            Your browser does not support audio playback.
+          </audio>
+        </div>
+      </section>
+
+      <footer><span>Sweet &amp; Spicy Meal Board</span><p>Call or text <a href="tel:+19375801373">937 580 1373</a></p><button onClick={openOwner}>Owner access</button></footer>
 
       {selected && <div className="scrim" onMouseDown={() => setSelected(null)}>
         <section className="meal-sheet" role="dialog" aria-modal="true" aria-labelledby="meal-title" onMouseDown={(event) => event.stopPropagation()}>
