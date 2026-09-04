@@ -7,6 +7,7 @@ export type Meal = {
   ingredients: string[];
   recipe: string[];
   available: boolean;
+  imageKey?: string;
 };
 
 export const seedMeals: Meal[] = [

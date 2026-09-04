@@ -4,6 +4,15 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { Meal, seedMeals } from "./lib/seed";
 
+async function responseError(response: Response, fallback: string) {
+  try {
+    const result = await response.json();
+    return typeof result.error === "string" ? result.error : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export default function Home() {
   const [meals, setMeals] = useState<Meal[]>(seedMeals);
   const [category, setCategory] = useState("Everything");
@@ -13,6 +22,8 @@ export default function Home() {
   const [authenticated, setAuthenticated] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
   const [loginError, setLoginError] = useState("");
+  const [formError, setFormError] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetch("/api/meals").then((response) => response.ok ? response.json() : Promise.reject()).then(setMeals).catch(() => undefined);
@@ -38,7 +49,22 @@ export default function Home() {
 
   async function saveMeal(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setFormError("");
+    setSaving(true);
     const data = new FormData(event.currentTarget);
+    let imageKey = data.get("removeImage") === "on" ? undefined : editing?.imageKey;
+    const image = data.get("image");
+    if (image instanceof File && image.size > 0) {
+      const upload = new FormData();
+      upload.set("image", image);
+      const uploadResponse = await fetch("/api/uploads", { method: "POST", body: upload });
+      if (!uploadResponse.ok) {
+        setFormError(await responseError(uploadResponse, "The photo could not be uploaded."));
+        setSaving(false);
+        return;
+      }
+      imageKey = (await uploadResponse.json()).imageKey;
+    }
     const meal: Meal = {
       id: editing?.id || Date.now(),
       name: String(data.get("name")),
@@ -48,10 +74,13 @@ export default function Home() {
       ingredients: String(data.get("ingredients")).split(",").map((item) => item.trim()).filter(Boolean),
       recipe: String(data.get("recipe")).split("\n").map((item) => item.trim()).filter(Boolean),
       available: data.get("available") === "on",
+      imageKey,
     };
     const response = await fetch("/api/meals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(meal) });
     if (response.ok) { setMeals(await response.json()); setEditing(null); }
     else if (response.status === 401) { setAuthenticated(false); setDashboardOpen(false); setLoginOpen(true); }
+    else { setFormError(await responseError(response, "The meal could not be saved.")); }
+    setSaving(false);
   }
 
   async function login(event: FormEvent<HTMLFormElement>) {
@@ -108,8 +137,9 @@ export default function Home() {
         <div className="meal-list">
           {available.length === 0 && <div className="empty-state"><span>Nothing posted</span><p>Check back later. This board changes whenever a meal is ready.</p></div>}
           {available.map((meal, index) => (
-            <article className="meal-row" key={meal.id}>
+            <article className={`meal-row ${meal.imageKey ? "has-photo" : ""}`} key={meal.id}>
               <div className="meal-number">{String(index + 1).padStart(2, "0")}</div>
+              {meal.imageKey && <div className="meal-photo"><Image src={`/api/images/${meal.imageKey}`} alt={meal.name} width={480} height={360} unoptimized /></div>}
               <div className="meal-copy"><span>{meal.category}</span><h3>{meal.name}</h3><p>{meal.description}</p></div>
               <div className="meal-price"><strong>${meal.price}</strong><small>per meal</small></div>
               <button className="details-button" onClick={() => setSelected(meal)}>Ingredients &amp; preparation <span>↗</span></button>
@@ -139,6 +169,7 @@ export default function Home() {
           <div className="sheet-index">Meal note / {selected.category}</div>
           <h2 id="meal-title">{selected.name}</h2>
           <p className="sheet-description">{selected.description}</p>
+          {selected.imageKey && <Image className="sheet-photo" src={`/api/images/${selected.imageKey}`} alt={selected.name} width={1200} height={800} unoptimized />}
           <div className="sheet-columns">
             <div><h3>Ingredients</h3><ul>{selected.ingredients.map((item) => <li key={item}>{item}</li>)}</ul></div>
             <div><h3>Preparation</h3><ol>{selected.recipe.map((step) => <li key={step}>{step}</li>)}</ol></div>
@@ -166,10 +197,10 @@ export default function Home() {
             {meals.map((meal) => <div className="dashboard-row" key={meal.id}>
               <div><strong>{meal.name}</strong><small>{meal.category} · ${meal.price}</small></div>
               <button className={`switch ${meal.available ? "on" : ""}`} onClick={() => toggleMeal(meal)} aria-pressed={meal.available}><span />{meal.available ? "Posted" : "Hidden"}</button>
-              <button className="text-button" onClick={() => setEditing(meal)}>Edit</button>
+              <button className="text-button" onClick={() => { setFormError(""); setEditing(meal); }}>Edit</button>
             </div>)}
           </div>
-          <button className="new-button" onClick={() => setEditing({ id: 0, name: "", description: "", price: 0, category: "", ingredients: [], recipe: [], available: true })}>+ Add a meal</button>
+          <button className="new-button" onClick={() => { setFormError(""); setEditing({ id: 0, name: "", description: "", price: 0, category: "", ingredients: [], recipe: [], available: true }); }}>+ Add a meal</button>
 
           {editing && <form className="edit-form" onSubmit={saveMeal}>
             <div className="form-heading"><h3>{editing.id ? "Edit meal" : "New meal"}</h3><button type="button" onClick={() => setEditing(null)}>Cancel</button></div>
@@ -178,8 +209,11 @@ export default function Home() {
             <div className="field-pair"><label>Price<input name="price" type="number" min="0" step="0.5" defaultValue={editing.price} required /></label><label>Category<input name="category" defaultValue={editing.category} required /></label></div>
             <label>Ingredients <small>Separate with commas</small><textarea name="ingredients" defaultValue={editing.ingredients.join(", ")} required /></label>
             <label>Preparation <small>One step per line</small><textarea name="recipe" defaultValue={editing.recipe.join("\n")} required /></label>
+            <label>Meal photo <small>JPEG, PNG, or WebP · maximum 5 MB</small><input name="image" type="file" accept="image/jpeg,image/png,image/webp" /></label>
+            {editing.imageKey && <div className="current-photo"><Image src={`/api/images/${editing.imageKey}`} alt={`Current photo of ${editing.name}`} width={240} height={160} unoptimized /><label className="check-field"><input name="removeImage" type="checkbox" /> Remove current photo</label></div>}
             <label className="check-field"><input name="available" type="checkbox" defaultChecked={editing.available} /> Post this meal now</label>
-            <button className="save-button" type="submit">Save meal</button>
+            {formError && <p className="login-error" role="alert">{formError}</p>}
+            <button className="save-button" type="submit" disabled={saving}>{saving ? "Uploading & saving..." : "Save meal"}</button>
           </form>}
         </section>
       </div>}
